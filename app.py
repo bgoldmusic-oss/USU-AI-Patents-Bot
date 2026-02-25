@@ -45,7 +45,7 @@ def patents_to_context(df: pd.DataFrame) -> str:
 
 def ask_claude(user_question: str, context: str) -> str:
     """Send user question + patent context to Claude and return the reply."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY") or st.secrets.get("ANTHROPIC_API_KEY", "")
+    api_key = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         return (
             "Error: ANTHROPIC_API_KEY is not set. "
