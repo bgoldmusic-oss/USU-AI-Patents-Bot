@@ -10,24 +10,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATA_FILE = "patents.csv"
-DATA_FILE_XLSX = "patents.xlsx"
+DATA_FILE = "Patents_Full_Data.xlsx"
 
 SYSTEM_PROMPT = """You are a helpful research assistant for USU (Utah State University) Patents.
 Answer questions using ONLY the patent records provided below. If the answer is not in the data, say so clearly.
-Cite specific patents (title or inventor) when relevant. Be concise and accurate."""
+Cite specific patents (title or inventor) when relevant. Be concise and accurate.
+Always include the Flintbox link at the bottom of any patent detail response, formatted as a markdown link like this: [View on Flintbox](URL)"""
 
 
 def load_patents():
-    """Load patent data from CSV or Excel. Returns a DataFrame."""
-    if os.path.exists(DATA_FILE):
-        return pd.read_csv(DATA_FILE)
-    if os.path.exists(DATA_FILE_XLSX):
-        return pd.read_excel(DATA_FILE_XLSX, engine="openpyxl")
-    raise FileNotFoundError(
-        f"Neither {DATA_FILE} nor {DATA_FILE_XLSX} found. "
-        "Add one of them to this folder with columns: Title, Abstract, Inventor, Link."
-    )
+    """Load patent data from Excel. Returns a DataFrame."""
+    if not os.path.exists(DATA_FILE):
+        raise FileNotFoundError(f"{DATA_FILE} not found. Add it to this folder.")
+    return pd.read_excel(DATA_FILE, engine="openpyxl")
 
 
 def patents_to_context(df: pd.DataFrame) -> str:
@@ -37,9 +32,13 @@ def patents_to_context(df: pd.DataFrame) -> str:
         rows.append(
             f"Patent {i + 1}:\n"
             f"  Title: {row.get('Title', '')}\n"
+            f"  Problem: {row.get('Problem', '')}\n"
+            f"  Solution: {row.get('Solution', '')}\n"
             f"  Abstract: {row.get('Abstract', '')}\n"
-            f"  Inventor: {row.get('Inventor', '')}\n"
-            f"  Link: {row.get('Link', '')}\n"
+            f"  Benefit: {row.get('Benefit', '')}\n"
+            f"  Market Application: {row.get('Market Application', '')}\n"
+            f"  Inventors: {row.get('Inventors', '')}\n"
+            f"  Flintbox Link: {row.get('Flintbox Link', '')}\n"
         )
     return "\n".join(rows)
 
@@ -79,12 +78,15 @@ def main():
         if password:
             st.error("Wrong password. Try again.")
         st.stop()
-    st.caption("Ask questions about USU patents. Data is loaded from a local CSV or Excel file.")
+    st.caption("Ask questions about USU patents. Data is loaded from a local Excel file.")
 
     try:
         df = load_patents()
         context = patents_to_context(df)
-        st.sidebar.success(f"Loaded {len(df)} patent(s) from {DATA_FILE if os.path.exists(DATA_FILE) else DATA_FILE_XLSX}.")
+        st.sidebar.success(f"Loaded {len(df)} patent(s) from {DATA_FILE}.")
+        if st.sidebar.button("Reset", help="Clear chat and start again"):
+            st.session_state.messages = []
+            st.rerun()
     except FileNotFoundError as e:
         st.error(str(e))
         st.stop()
@@ -92,9 +94,13 @@ def main():
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
+    LICENSING_MSG = "If you require more information or are interested in licensing please contact USU's Tech Transfer office at techtransfer@usu.edu"
+
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
+            if msg["role"] == "assistant":
+                st.caption(LICENSING_MSG)
 
     if prompt := st.chat_input("Ask a question about the patents..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
@@ -105,6 +111,7 @@ def main():
             with st.spinner("Thinking..."):
                 reply = ask_claude(prompt, context)
             st.markdown(reply)
+            st.caption(LICENSING_MSG)
         st.session_state.messages.append({"role": "assistant", "content": reply})
 
 
